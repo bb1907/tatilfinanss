@@ -1,0 +1,182 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: userId (UID)
+    // Fields:
+    //   - uid: string (required, immutable) - User's unique ID
+    //   - email: string (required, immutable) - User's email
+    //   - firstName: string (optional) - User's first name
+    //   - lastName: string (optional) - User's last name
+    //   - phone: string (optional) - User's phone number
+    //   - type: string (required, ['individual', 'corporate']) - Account type
+    //   - companyName: string (optional) - Company name
+    //   - taxNumber: string (optional) - Tax number
+    //   - taxOffice: string (optional) - Tax office
+    //   - authorizedPerson: string (optional) - Authorized person
+    //   - tcNo: string (optional) - ID number
+    //   - activePlan: map (optional) - Summary of active plan
+    //   - role: string (required, ['admin', 'user']) - User's role
+    //   - createdAt: timestamp (required, immutable) - Creation date
+    //
+    // Collection: plans
+    // Document ID: auto-generated
+    // Fields:
+    //   - userId: string (required, immutable) - Owner's UID
+    //   - destination: string (required) - Vacation destination
+    //   - totalBudget: number (required, positive) - Total target budget
+    //   - durationMonths: number (required, positive) - Savings duration
+    //   - monthlyAmount: number (required, positive) - Monthly savings
+    //   - currentSavings: number (required, non-negative) - Amount saved
+    //   - status: string (required, ['active', 'completed', 'cancelled']) - Plan status
+    //   - createdAt: timestamp (required, immutable) - Creation date
+    //
+    // Collection: deals
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required, < 100 chars) - Deal title
+    //   - description: string (optional, < 1000 chars) - Detailed description
+    //   - price: number (required, positive) - Current price
+    //   - category: string (required, ['flight', 'hotel', 'package']) - Category
+    //   - createdAt: timestamp (required, immutable) - Creation date
+    //
+    // Collection: blogPosts
+    // Document ID: auto-generated
+    // Fields:
+    //   - title: string (required, < 200 chars) - Post title
+    //   - content: string (required, < 10000 chars) - Full content
+    //   - date: string (required, ISO 8601) - Publication date
+    //   - createdAt: timestamp (required, immutable) - Creation date
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "bulent.bulu7@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function areImmutableFieldsUnchanged(fields) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(fields);
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidDateString(dateStr) {
+      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      let allowedFields = [
+        'uid', 'email', 'firstName', 'lastName', 'phone', 'type', 
+        'companyName', 'taxNumber', 'taxOffice', 'authorizedPerson', 
+        'tcNo', 'activePlan', 'role', 'createdAt'
+      ];
+      return hasOnlyAllowedFields(allowedFields) &&
+             data.uid == request.auth.uid &&
+             isValidEmail(data.email) &&
+             data.type in ['individual', 'corporate'] &&
+             data.role in ['admin', 'user'] &&
+             data.createdAt is timestamp &&
+             (!('phone' in data) || data.phone is string) &&
+             (!('companyName' in data) || data.companyName is string) &&
+             (!('taxNumber' in data) || data.taxNumber is string) &&
+             (!('taxOffice' in data) || data.taxOffice is string) &&
+             (!('authorizedPerson' in data) || data.authorizedPerson is string) &&
+             (!('tcNo' in data) || data.tcNo is string) &&
+             (!('activePlan' in data) || data.activePlan is map);
+    }
+
+    function isValidPlan(data) {
+      return hasOnlyAllowedFields(['userId', 'destination', 'totalBudget', 'durationMonths', 'monthlyAmount', 'currentSavings', 'status', 'createdAt']) &&
+             data.userId is string &&
+             data.destination is string && data.destination.size() > 0 && data.destination.size() < 100 &&
+             data.totalBudget is number && data.totalBudget > 0 &&
+             data.durationMonths is number && data.durationMonths > 0 &&
+             data.monthlyAmount is number && data.monthlyAmount > 0 &&
+             data.currentSavings is number && data.currentSavings >= 0 &&
+             data.status in ['active', 'completed', 'cancelled'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidDeal(data) {
+      return hasOnlyAllowedFields(['title', 'description', 'price', 'originalPrice', 'imageUrl', 'category', 'isPopular', 'limitedTime', 'lastRooms', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+             data.price is number && data.price > 0 &&
+             data.category in ['flight', 'hotel', 'package'] &&
+             data.createdAt is timestamp;
+    }
+
+    function isValidBlogPost(data) {
+      return hasOnlyAllowedFields(['title', 'description', 'content', 'date', 'imageUrl', 'author', 'createdAt']) &&
+             data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+             data.content is string && data.content.size() > 0 && data.content.size() < 10000 &&
+             isValidDateString(data.date) &&
+             data.createdAt is timestamp;
+    }
+
+    // ===============================================================
+    // Match Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && 
+                      (request.resource.data.role == 'user' || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+                      ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin()) &&
+                      areImmutableFieldsUnchanged(['uid', 'email', 'createdAt', 'type']);
+    }
+
+    match /plans/{planId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && isValidPlan(request.resource.data) && 
+                      request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && isValidPlan(request.resource.data) && 
+                      ((resource.data.userId == request.auth.uid && request.resource.data.userId == resource.data.userId) || isAdmin()) &&
+                      areImmutableFieldsUnchanged(['userId', 'createdAt']);
+      allow delete: if isAdmin();
+    }
+
+    match /deals/{dealId} {
+      allow read: if true; // Publicly readable
+      allow write: if isAdmin() && isValidDeal(request.resource.data);
+    }
+
+    match /blogPosts/{postId} {
+      allow read: if true; // Publicly readable
+      allow write: if isAdmin() && isValidBlogPost(request.resource.data);
+    }
+  }
+}

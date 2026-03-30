@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { 
   Wallet, 
   PlaneTakeoff, 
@@ -7,11 +7,14 @@ import {
   AlarmClock, 
   Bell, 
   BellRing, 
+  Calculator,
+  X,
   Map as MapIcon, 
   CreditCard, 
   CheckCircle2, 
   ArrowRight, 
   ChevronRight, 
+  ChevronDown,
   Trophy, 
   Share2, 
   Landmark, 
@@ -26,12 +29,53 @@ import {
   BookOpen,
   MessageSquare,
   Search,
-  ExternalLink
+  ExternalLink,
+  LayoutDashboard,
+  Settings,
+  Plus,
+  Trash2,
+  Edit,
+  LogOut,
+  LogIn,
+  User as UserIcon,
+  TrendingUp,
+  Activity
 } from "lucide-react";
+import { 
+  auth, 
+  db, 
+  signInWithGoogle, 
+  logout, 
+  onAuthStateChanged, 
+  doc, 
+  getDoc, 
+  setDoc, 
+  collection, 
+  addDoc, 
+  updateDoc, 
+  deleteDoc, 
+  onSnapshot, 
+  query, 
+  orderBy, 
+  Timestamp,
+  handleFirestoreError,
+  OperationType,
+  FirebaseUser,
+  createUserWithEmailAndPassword
+} from "./firebase";
 
 const translations = {
   tr: {
-    nav: { howItWorks: "Nasıl Çalışır", routes: "Rotalar", deals: "Fırsatlar", security: "Güvenlik", startNow: "Hemen Başla" },
+    nav: { 
+      howItWorks: "Nasıl Çalışır", 
+      routes: "Rotalar", 
+      deals: "Fırsatlar", 
+      security: "Güvenlik", 
+      startNow: "Hemen Başla",
+      signUp: "Üye Ol",
+      individual: "Bireysel",
+      corporate: "Kurumsal"
+    },
     hero: { title: "Hayalindeki Tatile Önce Biriktir, Sonra Git", subtitle: "Limit blokesi yok, kredi yükü yok. Kendi hızında biriktirerek hayalindeki tatile ulaş.", cta: "Hemen Biriktir", process: "Süreç Nasıl İşler?", jarTitle: "Tatil Birikimi™", jarSubtitle: "Geleceğin Tatili İçin Bugün Biriktir" },
     deals: { 
       title: "Fırsat Köşesi", 
@@ -44,7 +88,7 @@ const translations = {
       currentPrice: "Şu anki fiyat", 
       limitedTime: "SINIRLI SÜRE", 
       popular: "POPÜLER SEÇİM", 
-      lastRooms: "Son 3 Oda!", 
+      lastRooms: "Son 2 Oda!", 
       reserve: "Hemen Rezerve Et", 
       catch: "Fırsatı Yakala",
       saveFirst: "ÖNCE BİRİKTİR, SONRA GİT",
@@ -56,6 +100,15 @@ const translations = {
       breakfastIncluded: "Kahvaltı Dahil",
       getaway: "Kaçamağı",
       breeze: "Ege Rüzgarı"
+    },
+    calculator: {
+      title: "Tatil Birikim Hesaplayıcı",
+      target: "Hedef Tutar",
+      duration: "Birikim Süresi (Ay)",
+      monthly: "AYLIK BİRİKTİRMENİZ GEREKEN",
+      info: "Bu hesaplama tahmini olup, seçtiğiniz tatil paketinin güncel fiyatına göre değişiklik gösterebilir.",
+      start: "Hemen Başla",
+      month: "Ay"
     },
     process: { title: "Üç Adımda Özgürlük", step1: "1. Tatilini Seç", step1Desc: "Dünyanın en prestijli rotaları arasından sana en uygun olanı belirle.", step2: "2. Ödeme Planını Yapılandır", step2Desc: "Bütçene göre aylık taksit miktarını ve süresini esnekçe ayarla.", step3: "3. Biriktir ve Git", step3Desc: "Hedefine ulaştığında limit blokesi olmadan hayallerine uç." },
     features: { limitTitle: "Limit Blokesi Yok", limitDesc: "Kredi kartı limitlerinizi dondurmadan, borçlanmadan ve faiz yükü altına girmeden sadece biriktirerek tatile gidin. Paranız sizin kontrolünüzde kalsın.", flexibleTitle: "Esnek Ödeme Yöntemleri", flexibleDesc: "Bütçenize en uygun yöntemi seçin, her ay zahmetsizce biriktirin.", customTitle: "Kişiye Özel Rotalar", customDesc: "Sadece popüler olanı değil, hayal ettiğiniz her detayı kapsayan özel tatil planları. Kültür turlarından tropikal kaçamaklara kadar her şey mümkün.", exploreAll: "Tüm Rotaları Keşfet" },
@@ -70,9 +123,43 @@ const translations = {
         { title: "Santorini", desc: "Ege'nin eşsiz gün batımı ve ikonik mavi kubbeli evlerinde romantizmin zirvesi.", price: "$150", img: "https://lh3.googleusercontent.com/aida-public/AB6AXuB59Wp1tgq0CjXvqjjjrXRfmaWJkfQA5_alqNIGKURCo0efmQPmIv-VUV7vykc-5ypnSZkE9_bNEyOHvSV1qQ19briZ2zbURDkoxq5n5nN6WXTp46PA798Ldug1rx0l0yBs0QS6A4KZUv7C5r9ERpe0zTw--h_uFQAMpasy4q894grmdWicaBWYB4gBA6C41IGPf307MS-Twc65pXa3s54itP-kTmDnq2rjefY5rh0GU0j-7lQ8nhQiPO_QqCo8MoiapxF6oqD_TsX1" }
       ]
     },
-    trust: { bank: "BANKA ORTAĞI", ssl: "SSL GÜVENLİ", payment: "GÜVENLİ ÖDEME", encryption: "256-Bit Uçtan Uca Şifreleme" },
+    trust: { bank: "EFT / HAVALE", ssl: "SSL GÜVENLİ", payment: "GÜVENLİ ÖDEME", encryption: "256-Bit Uçtan Uca Şifreleme" },
     planner: { title: "Birikim Planlayıcı", subtitle: "Hayalindeki tatil için bütçeni ve vadenı belirle.", back: "Geri Dön", destination: "Nereye Gitmek İstersin?", budget: "Toplam Bütçe", duration: "Birikim Süresi", monthlyAmount: "AYLIK BİRİKİM TUTARI", start: "Planı Başlat", secure: "Güvenli Birikim", secureDesc: "Biriktirdiğiniz tutarlar TatilFinans güvencesiyle korunur. İstediğiniz zaman planınızı iptal edebilir veya değiştirebilirsiniz.", month: "Ay", target: "Hedef", term: "Vade", total: "Toplam", destinations: { istanbul: "İstanbul", maldives: "Maldivler", bali: "Bali", santorini: "Santorini", phuket: "Phuket", rome: "Roma", london: "Londra", ankara: "Ankara" } },
-    signup: { back: "Planı Düzenle", title: "Aramıza Hoş Geldin!", subtitle: "Hayallerine bir adım daha yaklaştın. Planını kaydetmek ve biriktirmeye başlamak için hesabını oluştur.", summary: "SEÇİLEN PLAN ÖZETİ", month: "Ay Vade", security: "Uluslararası Güvenlik Standartları", cancel: "Dilediğin Zaman İptal Hakkı", alerts: "Akıllı Fiyat Takip Uyarıları", firstName: "Ad", lastName: "Soyad", email: "E-posta", password: "Şifre", terms: "Kullanım Koşulları", privacy: "Gizlilik Politikası", submit: "Hesabımı Oluştur ve Başla", hasAccount: "Zaten hesabın var mı?", login: "Giriş Yap", firstNamePlaceholder: "Ahmet", lastNamePlaceholder: "Yılmaz", emailPlaceholder: "ahmet@ornek.com", agreeText: "okudum, onaylıyorum.", and: "ve" },
+    signup: { 
+      back: "Planı Düzenle", 
+      title: "Aramıza Hoş Geldin!", 
+      subtitle: "Hayallerine bir adım daha yaklaştın. Planını kaydetmek ve biriktirmeye başlamak için hesabını oluştur.", 
+      summary: "SEÇİLEN PLAN ÖZETİ", 
+      month: "Ay Vade", 
+      security: "Uluslararası Güvenlik Standartları", 
+      cancel: "Dilediğin Zaman İptal Hakkı", 
+      alerts: "Akıllı Fiyat Takip Uyarıları", 
+      firstName: "Ad", 
+      lastName: "Soyad", 
+      email: "E-posta", 
+      password: "Şifre", 
+      terms: "Kullanım Koşulları", 
+      privacy: "Gizlilik Politikası", 
+      submit: "Hesabımı Oluştur ve Başla", 
+      hasAccount: "Zaten hesabın var mı?", 
+      login: "Giriş Yap", 
+      firstNamePlaceholder: "Ahmet", 
+      lastNamePlaceholder: "Yılmaz", 
+      emailPlaceholder: "ahmet@ornek.com", 
+      agreeText: "okudum, onaylıyorum.", 
+      and: "ve",
+      companyName: "Şirket Adı",
+      taxNumber: "Vergi Numarası",
+      taxOffice: "Vergi Dairesi",
+      corporateTitle: "Kurumsal Üyelik",
+      individualTitle: "Bireysel Üyelik",
+      corporateSubtitle: "Şirketiniz için avantajlı tatil birikim planları oluşturun.",
+      phone: "Telefon Numarası",
+      authorizedPerson: "Yetkili Kişi",
+      tcNo: "T.C. Kimlik Numarası (Opsiyonel)",
+      error: "Bir hata oluştu. Lütfen tekrar deneyin.",
+      success: "Üyeliğiniz başarıyla oluşturuldu! Yönlendiriliyorsunuz..."
+    },
     footer: { desc: "Türkiye'nin en yenilikçi tatil birikim platformu. Hayalleriniz için güvenli ve akıllı bir yol sunuyoruz.", company: "Şirket", support: "Destek", newsletter: "Bültene Katıl", newsletterDesc: "En yeni rotalar ve fırsatlardan ilk siz haberdar olun.", send: "Gönder", rights: "TatilFinans Teknolojileri A.Ş. Tüm hakları saklıdır.", about: "Hakkımızda", contact: "İletişim", career: "Kariyer", faq: "Sıkça Sorulan Sorular", help: "Yardım Merkezi", blog: "Blog", terms: "Kullanım Koşulları", privacy: "Gizlilik Politikası", emailPlaceholder: "E-posta adresiniz" },
     about: {
       storyTitle: "Hikayemiz",
@@ -154,10 +241,38 @@ const translations = {
         { title: "Gurme Gezginlerin Mutlaka Görmesi Gereken Şehirler", desc: "Lezzet duraklarıyla ünlü, damağınızda iz bırakacak rotalar.", date: "01 Mart 2024" }
       ]
     },
-    common: { monthAbbr: "ay", installments: "TAKSİT", interestFree: "FAİZSİZ", debtFree: "BORÇSUZ", noCommission: "KOMİSYONSUZ", creditCard: "Kredi Kartı", debitCard: "ATM (Debit) Kartı", bankTransfer: "EFT / Havale" }
+    common: { monthAbbr: "ay", installments: "TAKSİT", interestFree: "FAİZSİZ", debtFree: "BORÇSUZ", noCommission: "KOMİSYONSUZ", creditCard: "Kredi Kartı", debitCard: "ATM (Debit) Kartı", bankTransfer: "EFT / Havale", login: "Giriş Yap", logout: "Çıkış Yap", adminPanel: "Yönetim Paneli" },
+    admin: {
+      dashboard: "Panel",
+      deals: "Fırsat Yönetimi",
+      users: "Kullanıcılar",
+      plans: "Birikim Planları",
+      stats: "İstatistikler",
+      totalSavings: "Toplam Birikim",
+      activePlans: "Aktif Planlar",
+      totalUsers: "Toplam Kullanıcı",
+      recentActivity: "Son İşlemler",
+      addDeal: "Yeni Fırsat Ekle",
+      editDeal: "Fırsatı Düzenle",
+      title: "Başlık",
+      price: "Fiyat",
+      category: "Kategori",
+      save: "Kaydet",
+      cancel: "İptal",
+      deleteConfirm: "Bu öğeyi silmek istediğinizden emin misiniz?"
+    }
   },
   en: {
-    nav: { howItWorks: "How it Works", routes: "Routes", deals: "Deals", security: "Security", startNow: "Start Now" },
+    nav: { 
+      howItWorks: "How it Works", 
+      routes: "Routes", 
+      deals: "Deals", 
+      security: "Security", 
+      startNow: "Start Now",
+      signUp: "Sign Up",
+      individual: "Individual",
+      corporate: "Corporate"
+    },
     hero: { title: "Save First, Go Later for Your Dream Vacation", subtitle: "No limit block, no credit burden. Reach your dream vacation by saving at your own pace.", cta: "Start Saving", process: "How it Works?", jarTitle: "Vacation Savings™", jarSubtitle: "Save Today for Future Vacations" },
     deals: { 
       title: "Deals Corner", 
@@ -196,9 +311,43 @@ const translations = {
         { title: "Santorini", desc: "The peak of romance in the unique sunset of the Aegean and iconic blue-domed houses.", price: "$150", img: "https://lh3.googleusercontent.com/aida-public/AB6AXuB59Wp1tgq0CjXvqjjjrXRfmaWJkfQA5_alqNIGKURCo0efmQPmIv-VUV7vykc-5ypnSZkE9_bNEyOHvSV1qQ19briZ2zbURDkoxq5n5nN6WXTp46PA798Ldug1rx0l0yBs0QS6A4KZUv7C5r9ERpe0zTw--h_uFQAMpasy4q894grmdWicaBWYB4gBA6C41IGPf307MS-Twc65pXa3s54itP-kTmDnq2rjefY5rh0GU0j-7lQ8nhQiPO_QqCo8MoiapxF6oqD_TsX1" }
       ]
     },
-    trust: { bank: "BANK PARTNER", ssl: "SSL SECURE", payment: "SECURE PAYMENT", encryption: "256-Bit End-to-End Encryption" },
+    trust: { bank: "EFT / WIRE TRANSFER", ssl: "SSL SECURE", payment: "SECURE PAYMENT", encryption: "256-Bit End-to-End Encryption" },
     planner: { title: "Savings Planner", subtitle: "Determine your budget and term for your dream vacation.", back: "Back", destination: "Where Do You Want to Go?", budget: "Total Budget", duration: "Savings Duration", monthlyAmount: "MONTHLY SAVINGS AMOUNT", start: "Start Plan", secure: "Secure Savings", secureDesc: "Your savings are protected under TatilFinans guarantee. You can cancel or change your plan at any time.", month: "Months", target: "Target", term: "Term", total: "Total", destinations: { istanbul: "Istanbul", maldives: "Maldives", bali: "Bali", santorini: "Santorini", phuket: "Phuket", rome: "Rome", london: "London", ankara: "Ankara" } },
-    signup: { back: "Edit Plan", title: "Welcome to the Family!", subtitle: "You are one step closer to your dreams. Create your account to save your plan and start saving.", summary: "SELECTED PLAN SUMMARY", month: "Months Term", security: "International Security Standards", cancel: "Right to Cancel Anytime", alerts: "Smart Price Tracking Alerts", firstName: "First Name", lastName: "Last Name", email: "Email", password: "Password", terms: "Terms of Use", privacy: "Privacy Policy", submit: "Create My Account and Start", hasAccount: "Already have an account?", login: "Log In", firstNamePlaceholder: "John", lastNamePlaceholder: "Doe", emailPlaceholder: "john@example.com", agreeText: "I have read and agree to the", and: "and" },
+    signup: { 
+      back: "Edit Plan", 
+      title: "Welcome to the Family!", 
+      subtitle: "You are one step closer to your dreams. Create your account to save your plan and start saving.", 
+      summary: "SELECTED PLAN SUMMARY", 
+      month: "Months Term", 
+      security: "International Security Standards", 
+      cancel: "Right to Cancel Anytime", 
+      alerts: "Smart Price Tracking Alerts", 
+      firstName: "First Name", 
+      lastName: "Last Name", 
+      email: "Email", 
+      password: "Password", 
+      terms: "Terms of Use", 
+      privacy: "Privacy Policy", 
+      submit: "Create My Account and Start", 
+      hasAccount: "Already have an account?", 
+      login: "Log In", 
+      firstNamePlaceholder: "John", 
+      lastNamePlaceholder: "Doe", 
+      emailPlaceholder: "john@example.com", 
+      agreeText: "I have read and agree to the", 
+      and: "and",
+      companyName: "Company Name",
+      taxNumber: "Tax Number",
+      taxOffice: "Tax Office",
+      corporateTitle: "Corporate Membership",
+      individualTitle: "Individual Membership",
+      corporateSubtitle: "Create advantageous holiday savings plans for your company.",
+      phone: "Phone Number",
+      authorizedPerson: "Authorized Person",
+      tcNo: "ID Number (Optional)",
+      error: "An error occurred. Please try again.",
+      success: "Your membership has been successfully created! Redirecting..."
+    },
     footer: { desc: "Turkey's most innovative holiday savings platform. We offer a secure and smart way for your dreams.", company: "Company", support: "Support", newsletter: "Join Newsletter", newsletterDesc: "Be the first to know about the newest routes and opportunities.", send: "Send", rights: "TatilFinans Technologies Inc. All rights reserved.", about: "About Us", contact: "Contact", career: "Careers", faq: "FAQ", help: "Help Center", blog: "Blog", terms: "Terms of Use", privacy: "Privacy Policy", emailPlaceholder: "Your email address" },
     about: {
       storyTitle: "Our Story",
@@ -280,18 +429,44 @@ const translations = {
         { title: "Must-See Cities for Gourmet Travelers", desc: "Routes famous for their flavor stops that will leave a mark on your palate.", date: "March 01, 2024" }
       ]
     },
-    common: { monthAbbr: "mo", installments: "INSTALLMENTS", interestFree: "INTEREST-FREE", debtFree: "DEBT-FREE", noCommission: "NO COMMISSION", creditCard: "Credit Card", debitCard: "Debit Card", bankTransfer: "Bank Transfer" }
+    common: { monthAbbr: "mo", installments: "INSTALLMENTS", interestFree: "INTEREST-FREE", debtFree: "DEBT-FREE", noCommission: "NO COMMISSION", creditCard: "Credit Card", debitCard: "Debit Card", bankTransfer: "Bank Transfer", login: "Log In", logout: "Log Out", adminPanel: "Admin Panel" },
+    admin: {
+      dashboard: "Dashboard",
+      deals: "Deal Management",
+      users: "Users",
+      plans: "Savings Plans",
+      stats: "Statistics",
+      totalSavings: "Total Savings",
+      activePlans: "Active Plans",
+      totalUsers: "Total Users",
+      recentActivity: "Recent Activity",
+      addDeal: "Add New Deal",
+      editDeal: "Edit Deal",
+      title: "Title",
+      price: "Price",
+      category: "Category",
+      save: "Save",
+      cancel: "Cancel",
+      deleteConfirm: "Are you sure you want to delete this item?"
+    }
   }
 };
 
-const Navbar = ({ onNavigate, onStart, language, setLanguage }: { 
+const Navbar = ({ onNavigate, onStart, onLoginClick, language, setLanguage, user, role, onAdminClick, onDashboardClick }: { 
   onNavigate?: () => void, 
-  onStart?: () => void,
+  onStart?: (type?: "individual" | "corporate") => void,
+  onLoginClick?: () => void,
   language: "tr" | "en",
-  setLanguage: (lang: "tr" | "en") => void
+  setLanguage: (lang: "tr" | "en") => void,
+  user: FirebaseUser | null,
+  role: string | null,
+  onAdminClick: () => void,
+  onDashboardClick: () => void
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSignUpOpen, setIsSignUpOpen] = useState(false);
   const t = translations[language].nav;
+  const common = translations[language].common;
 
   const navLinks = [
     { name: t.howItWorks, href: "#nasil-calisir" },
@@ -303,11 +478,15 @@ const Navbar = ({ onNavigate, onStart, language, setLanguage }: {
   const handleLogoClick = () => {
     if (onNavigate) onNavigate();
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (window.location.hash) {
+      window.history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
   };
 
-  const handleStartClick = () => {
-    if (onStart) onStart();
+  const handleStartClick = (type: "individual" | "corporate" = "individual") => {
+    if (onStart) onStart(type);
     setIsOpen(false);
+    setIsSignUpOpen(false);
   };
 
   return (
@@ -351,12 +530,95 @@ const Navbar = ({ onNavigate, onStart, language, setLanguage }: {
         </div>
 
         <div className="flex items-center gap-4">
-          <button 
-            onClick={onStart}
-            className="hidden sm:block bg-primary hover:bg-primary-container text-white px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95 duration-150 ease-in-out shadow-md shadow-primary/10"
-          >
-            {t.startNow}
-          </button>
+          {role === "admin" && (
+            <button 
+              onClick={() => {
+                // In a real app, this would be window.location.href = "https://panel.tatilfinans.com"
+                onAdminClick();
+              }}
+              className="hidden lg:flex items-center gap-2 text-primary hover:text-primary-container font-bold text-sm transition-colors"
+            >
+              <LayoutDashboard className="w-4 h-4" />
+              {common.adminPanel}
+            </button>
+          )}
+
+          {user && (
+            <button 
+              onClick={onDashboardClick}
+              className="hidden sm:flex items-center gap-2 text-secondary hover:text-primary font-bold text-sm transition-colors"
+            >
+              <LayoutDashboard className="w-5 h-5" />
+              <span className="hidden lg:block">{language === "tr" ? "Panelim" : "My Panel"}</span>
+            </button>
+          )}
+
+          {user ? (
+            <div className="flex items-center gap-4">
+              <div className="hidden sm:flex items-center gap-2">
+                {user.photoURL ? (
+                  <img src={user.photoURL} alt={user.displayName || ""} className="w-8 h-8 rounded-full border border-outline-variant/30" referrerPolicy="no-referrer" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <UserIcon className="w-4 h-4" />
+                  </div>
+                )}
+                <span className="text-xs font-bold text-secondary hidden lg:block">{user.displayName}</span>
+              </div>
+              <button 
+                onClick={logout}
+                className="p-2 text-on-surface-variant hover:text-error transition-colors"
+                title={common.logout}
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
+          ) : (
+            <button 
+              onClick={onLoginClick}
+              className="flex items-center gap-2 text-secondary hover:text-primary font-bold text-sm transition-colors"
+            >
+              <LogIn className="w-5 h-5" />
+              <span className="hidden sm:block">{common.login}</span>
+            </button>
+          )}
+
+          {/* Dropdown for Sign Up */}
+          <div className="relative hidden sm:block">
+            <button 
+              onClick={() => setIsSignUpOpen(!isSignUpOpen)}
+              className="bg-primary hover:bg-primary-container text-white px-6 py-2.5 rounded-xl font-bold transition-all active:scale-95 duration-150 ease-in-out shadow-md shadow-primary/10 flex items-center gap-2"
+            >
+              {t.signUp}
+              <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isSignUpOpen ? 'rotate-180' : ''}`} />
+            </button>
+            
+            <AnimatePresence>
+              {isSignUpOpen && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  className="absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-2xl border border-outline-variant/20 overflow-hidden py-2"
+                >
+                  <button 
+                    onClick={() => handleStartClick("individual")}
+                    className="w-full text-left px-4 py-3 text-sm font-bold text-secondary hover:bg-primary/5 hover:text-primary transition-colors flex items-center gap-3"
+                  >
+                    <UserIcon className="w-4 h-4" />
+                    {t.individual}
+                  </button>
+                  <button 
+                    onClick={() => handleStartClick("corporate")}
+                    className="w-full text-left px-4 py-3 text-sm font-bold text-secondary hover:bg-primary/5 hover:text-primary transition-colors flex items-center gap-3"
+                  >
+                    <Landmark className="w-4 h-4" />
+                    {t.corporate}
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
           
           {/* Mobile Menu Toggle */}
           <button 
@@ -394,21 +656,84 @@ const Navbar = ({ onNavigate, onStart, language, setLanguage }: {
               {link.name}
             </a>
           ))}
-          <div className="pt-6 border-t border-outline-variant/20 flex flex-col gap-4">
+          
+          {role === "admin" && (
             <button 
-              onClick={handleStartClick}
-              className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg"
+              onClick={() => {
+                onAdminClick();
+                setIsOpen(false);
+              }}
+              className="flex items-center gap-2 text-primary font-bold text-lg"
             >
-              {t.startNow}
+              <LayoutDashboard className="w-5 h-5" />
+              {common.adminPanel}
             </button>
-            <div className="flex justify-center gap-4 text-sm font-bold">
+          )}
+
+          <div className="pt-6 border-t border-outline-variant/20 flex flex-col gap-4">
+            {user ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 px-1">
+                  {user.photoURL ? (
+                    <img src={user.photoURL} alt={user.displayName || ""} className="w-10 h-10 rounded-full border border-outline-variant/30" referrerPolicy="no-referrer" />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                      <UserIcon className="w-5 h-5" />
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-sm font-bold text-secondary">{user.displayName}</p>
+                    <p className="text-xs text-on-surface-variant">{user.email}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    logout();
+                    setIsOpen(false);
+                  }}
+                  className="w-full bg-surface-container-low text-error py-4 rounded-xl font-bold flex items-center justify-center gap-2"
+                >
+                  <LogOut className="w-5 h-5" />
+                  {common.logout}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-widest px-1">{t.signUp}</p>
+                <button 
+                  onClick={() => handleStartClick("individual")}
+                  className="w-full bg-primary text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2"
+                >
+                  <UserIcon className="w-5 h-5" />
+                  {t.individual}
+                </button>
+                <button 
+                  onClick={() => handleStartClick("corporate")}
+                  className="w-full bg-secondary text-white py-4 rounded-xl font-bold shadow-lg flex items-center justify-center gap-2"
+                >
+                  <Landmark className="w-5 h-5" />
+                  {t.corporate}
+                </button>
+                <button 
+                  onClick={() => {
+                    if (onLoginClick) onLoginClick();
+                    setIsOpen(false);
+                  }}
+                  className="w-full bg-white border border-outline-variant/30 text-secondary py-4 rounded-xl font-bold flex items-center justify-center gap-2"
+                >
+                  <LogIn className="w-5 h-5" />
+                  {common.login}
+                </button>
+              </div>
+            )}
+            <div className="flex justify-center gap-4 text-sm font-bold pt-4">
               <span 
                 onClick={() => setLanguage("tr")}
                 className={`${language === "tr" ? "text-primary" : "text-slate-500"} cursor-pointer`}
               >
                 TR
               </span>
-              <span className="text-slate-300">|</span>
+              <span className="text-slate-400">|</span>
               <span 
                 onClick={() => setLanguage("en")}
                 className={`${language === "en" ? "text-primary" : "text-slate-500"} cursor-pointer`}
@@ -495,8 +820,142 @@ const Hero = ({ onStart, language }: { onStart: () => void, language: "tr" | "en
   );
 };
 
-const DealsSection = ({ language }: { language: "tr" | "en" }) => {
+const CountdownTimer = ({ hours, minutes, seconds }: { hours: number, minutes: number, seconds: number }) => {
+  const [timeLeft, setTimeLeft] = useState(hours * 3600 + minutes * 60 + seconds);
+
+  useEffect(() => {
+    if (timeLeft <= 0) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft]);
+
+  const h = Math.floor(timeLeft / 3600);
+  const m = Math.floor((timeLeft % 3600) / 60);
+  const s = timeLeft % 60;
+
+  return (
+    <span className="bg-error text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
+      <AlarmClock className="w-3 h-3" /> {h.toString().padStart(2, '0')}:{m.toString().padStart(2, '0')}:{s.toString().padStart(2, '0')}
+    </span>
+  );
+};
+
+const CalculatorModal = ({ isOpen, onClose, onStart, language }: { isOpen: boolean, onClose: () => void, onStart: (plan: { target: number, months: number }) => void, language: "tr" | "en" }) => {
+  const [target, setTarget] = useState(1000);
+  const [months, setMonths] = useState(12);
+  const monthly = Math.round(target / months);
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        className="bg-white rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl"
+      >
+        <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center text-primary">
+              <Calculator className="w-6 h-6" />
+            </div>
+            <h3 className="font-bold text-secondary text-lg">Tatil Birikim Hesaplayıcı</h3>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-full transition-colors">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="p-8 space-y-10">
+          <div className="space-y-6">
+            <div className="flex justify-between items-end">
+              <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Hedef Tutar</label>
+              <span className="text-3xl font-black text-primary">${target.toLocaleString()}</span>
+            </div>
+            <input 
+              type="range" 
+              min="50" 
+              max="5000" 
+              step="50"
+              value={target}
+              onChange={(e) => setTarget(parseInt(e.target.value))}
+              className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+              <span>$50</span>
+              <span>$5,000</span>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="flex justify-between items-end">
+              <label className="text-sm font-bold text-slate-500 uppercase tracking-wider">Birikim Süresi (Ay)</label>
+              <span className="text-3xl font-black text-primary">{months} Ay</span>
+            </div>
+            <input 
+              type="range" 
+              min="3" 
+              max="24" 
+              step="1"
+              value={months}
+              onChange={(e) => setMonths(parseInt(e.target.value))}
+              className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-primary"
+            />
+            <div className="flex justify-between text-[10px] font-bold text-slate-400 uppercase">
+              <span>3 AY</span>
+              <span>24 AY</span>
+            </div>
+          </div>
+
+          <div className="bg-primary/5 rounded-3xl p-6 border border-primary/10 relative overflow-hidden">
+            <div className="relative z-10">
+              <p className="text-[10px] font-bold text-primary uppercase tracking-widest mb-2">AYLIK BİRİKTİRMENİZ GEREKEN</p>
+              <div className="flex items-baseline gap-2">
+                <span className="text-5xl font-black text-primary">${monthly}</span>
+                <span className="text-lg font-bold text-primary/60">/ ay</span>
+              </div>
+            </div>
+            <div className="absolute right-[-10px] bottom-[-10px] opacity-10">
+              <Calculator className="w-32 h-32 text-primary" />
+            </div>
+          </div>
+
+          <div className="flex gap-3 p-4 bg-slate-50 rounded-2xl border border-slate-100">
+            <div className="mt-0.5">
+              <div className="w-5 h-5 rounded-full border-2 border-primary/30 flex items-center justify-center text-primary">
+                <span className="text-[10px] font-bold">i</span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              Bu hesaplama tahmini olup, seçtiğiniz tatil paketinin güncel fiyatına göre değişiklik gösterebilir.
+            </p>
+          </div>
+
+          <button 
+            onClick={() => onStart({ target, months })}
+            className="w-full py-5 bg-[#1a637a] text-white rounded-2xl font-bold text-lg hover:bg-primary transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2 group"
+          >
+            Hemen Başla
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </button>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const DealsSection = ({ language, onSelect }: { language: "tr" | "en", onSelect?: (plan: { destination: string, budget: number, months: number }) => void }) => {
   const t = translations[language].deals;
+  
+  const handleReserve = (destination: string, budget: number, months: number) => {
+    if (onSelect) {
+      onSelect({ destination, budget, months });
+    }
+  };
+
   return (
     <section id="firsatlar" className="py-24 bg-white scroll-mt-20">
       <div className="max-w-7xl mx-auto px-6">
@@ -517,27 +976,25 @@ const DealsSection = ({ language }: { language: "tr" | "en" }) => {
               {t.flights}
             </h3>
             {[
-              { route: `${translations[language].planner.destinations.istanbul} ➔ ${translations[language].planner.destinations.london}`, date: language === "tr" ? "Gidiş-Dönüş • 12-18 Nisan" : "Round Trip • April 12-18", price: "$189", tag: t.priceDropped, tagColor: "bg-green-100 text-green-700" },
-              { route: `${translations[language].planner.destinations.ankara} ➔ ${translations[language].planner.destinations.rome}`, date: language === "tr" ? "Tek Yön • 5 Mayıs" : "One Way • May 5", price: "$85", tag: t.tracking, tagColor: "bg-primary/10 text-primary" }
+              { route: "İstanbul ➔ Maldivler", date: language === "tr" ? "Gidiş-Dönüş • 15-22 Mayıs" : "Round Trip • May 15-22", price: "$499", tag: t.priceDropped, tagColor: "bg-green-100 text-green-700" },
+              { route: "İstanbul ➔ Bali", date: language === "tr" ? "Tek Yön • 10 Haziran" : "One Way • June 10", price: "$425", tag: t.tracking, tagColor: "bg-slate-100 text-slate-500" }
             ].map((flight, i) => (
               <motion.div 
                 key={i}
                 whileHover={{ y: -5 }}
-                className="bg-surface-container-low p-5 rounded-2xl border border-outline-variant/30 hover:shadow-md transition-shadow"
+                className="bg-slate-50 p-5 rounded-2xl border border-slate-100 hover:shadow-md transition-shadow"
               >
-                <div className="flex justify-between items-start mb-4">
-                  <div>
-                    <p className="text-sm font-bold text-secondary">{flight.route}</p>
-                    <p className="text-xs text-on-surface-variant">{flight.date}</p>
-                  </div>
+                <div className="flex justify-between items-start mb-2">
+                  <p className="text-sm font-bold text-secondary">{flight.route}</p>
                   <span className={`px-2 py-1 ${flight.tagColor} text-[10px] font-bold rounded uppercase`}>{flight.tag}</span>
                 </div>
+                <p className="text-xs text-on-surface-variant mb-6">{flight.date}</p>
                 <div className="flex items-end justify-between">
                   <div>
-                    <p className="text-xs text-on-surface-variant">{t.currentPrice}</p>
+                    <p className="text-[10px] font-bold text-on-surface-variant uppercase mb-1">{t.currentPrice}</p>
                     <p className="text-2xl font-black text-primary">{flight.price}</p>
                   </div>
-                  <button className="p-2 bg-white rounded-full text-primary shadow-sm hover:bg-primary hover:text-white transition-colors">
+                  <button className="p-2.5 bg-white rounded-full text-primary shadow-sm border border-slate-100 hover:bg-primary hover:text-white transition-colors">
                     <Bell className="w-4 h-4" />
                   </button>
                 </div>
@@ -551,67 +1008,76 @@ const DealsSection = ({ language }: { language: "tr" | "en" }) => {
             </h3>
             <div className="grid md:grid-cols-2 gap-6">
               <motion.div whileHover={{ y: -10 }} className="group relative bg-white rounded-3xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all">
-                <div className="h-48 overflow-hidden relative">
+                <div className="h-56 overflow-hidden relative">
                   <img 
-                    alt="Phuket Fırsatı" 
+                    alt="Maldivler Rüya Tatili" 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuBN1N1cuzJdU1Bfm8AXc1Id51caitRWRUupzncnO0fISRXshFBsBUDPfjl54oFAVOtF7E32HAVTZHiaZ-pDjLIVIP_YPkXTbTNZw7cIX8_NY3M5L3N653XsGatW1OLU6UhsmkVHZ7O-Nn0hUMo5XTDRDu7jW0r5n2MMKiY6qumrbwkOJX_v10k2DYu2-iHK7pVo90aYB09dK30jjcdXsjjRIZ3bzrdoNIJE18MJXrOGlCNrd1thsy0q9OJ4v99A5aTruqwD9jh3aczp"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAHjIBX-w1OlNHxN5WH4q8x3IkF0tTjPNs-VqcXN0KuIePmwritUQBGfExXDGKnnS_hbcyB-nLM2MenMkWuofOC5t_Ta-FYyrF73QJD7kCUvH8wzDwN-myOT-yqcOk26oweNv26h0udhyqFlFlsLswZhSINDkukWGhuFOe7MuAfyEqs2Kg3Ysruhe6w0wLh1SvqpBVZpKMgOqgPvb0d-y9kAbQDGHQTdPG7chH2n8I9fmVB40Ew2a61MR3QzNdJmT2u_Q5FUY6GJAkZ"
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-3 left-3 flex gap-2">
-                    <span className="bg-error text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide flex items-center gap-1">
-                      <AlarmClock className="w-3 h-3" /> 02:14:55
-                    </span>
-                    <span className="bg-secondary text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide">{t.limitedTime}</span>
+                    <CountdownTimer hours={2} minutes={14} seconds={24} />
+                    <span className="bg-slate-700/80 backdrop-blur text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide">SINIRLI SÜRE</span>
                   </div>
                 </div>
                 <div className="p-6">
-                  <h4 className="text-lg font-bold text-secondary mb-1">Phuket {t.getaway}</h4>
+                  <h4 className="text-lg font-bold text-secondary mb-1">Maldivler Rüya Tatili</h4>
                   <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
-                    7 {t.nights} • {t.allInclusive} • {t.flightIncluded}
+                    5 Gece • Su Üstü Villası • Uçuş Dahil
                   </p>
-                  <div className="bg-primary/5 p-3 rounded-xl mb-4 border border-primary/10">
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-tighter">
+                  <div className="bg-primary/5 p-4 rounded-xl mb-4 border border-primary/10">
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-tighter mb-1">
                       {t.saveFirst}
                     </p>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-primary">$100</span>
-                      <span className="text-xs font-semibold text-primary-container">/{translations[language].common.monthAbbr} (12 {translations[language].common.installments})</span>
+                      <span className="text-2xl font-black text-primary">$180</span>
+                      <span className="text-xs font-semibold text-primary-container">/ay (12 Taksit)</span>
                     </div>
                   </div>
-                  <button className="w-full py-2.5 bg-secondary text-white rounded-xl font-bold text-sm hover:bg-primary transition-colors">{t.reserve}</button>
+                  <button 
+                    onClick={() => handleReserve("Maldivler", 2160, 12)}
+                    className="w-full py-3 bg-[#4a5578] text-white rounded-xl font-bold text-sm hover:bg-primary transition-colors active:scale-95"
+                  >
+                    Hemen Rezerve Et
+                  </button>
                 </div>
               </motion.div>
               <motion.div whileHover={{ y: -10 }} className="group relative bg-white rounded-3xl overflow-hidden shadow-sm border border-outline-variant/20 hover:shadow-xl transition-all">
-                <div className="h-48 overflow-hidden relative">
+                <div className="h-56 overflow-hidden relative">
                   <img 
-                    alt="Santorini Fırsatı" 
+                    alt="Bali: Ruhsal Kaçış" 
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuCI4l9cTtGcYa5XJltegPcaQx1VP8jshm4CJHQST9XaJY33eEZ400JtxIHZOcUIjOQb695tG3Xq2ohyxxCJEXZqFitKv1mppbLbnzctW1B9b3MNk32nV7VTkKUE0cgKxudFpICOjnvjVAfeAlqDyjOTKP6WDPB6DqSVQSE4zwcvKKDe0r40SNn03K6AhxqXGjRczlfVSZSz93lys1BTmE_zi7O-WpqY_-qvsGz95vw9SD12yZmFY64vJ3U7wLSD4m3g9Cya_n6HoTXR"
+                    src="https://lh3.googleusercontent.com/aida-public/AB6AXuAri7gyigObYm51D-BI8C2BSQbq2aVzXCvvaagXmx7fA35SYsmTKri8Y35Zzot_YJuxmUYLnTqenk0lwa9JVNPM8kNjWFW0jKs6c8f8Olu-OHL2yP_KionCin6sBluFtrIFV3uXAzQq9CkGe4WZVyOYBTzqui9OFynYIWSjZUP31KClo_LW76mG66p0UL27lMxOKciH_jBolxmV4Cb7v3D_G0kIOodUinsh16NJlWu_mo8ZzG77WxwJRCeV2ddk65vjxtyj6-QxTcpU"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute top-3 left-3">
-                    <span className="bg-primary text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide">{t.popular}</span>
+                  <div className="absolute top-3 left-3 flex gap-2">
+                    <CountdownTimer hours={5} minutes={41} seconds={41} />
+                    <span className="bg-slate-700/80 backdrop-blur text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide">POPÜLER</span>
                   </div>
                   <div className="absolute top-3 right-3">
-                    <span className="bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-[10px] font-bold text-error">{t.lastRooms}</span>
+                    <span className="bg-white/90 backdrop-blur px-2 py-1 rounded-lg text-[10px] font-bold text-error">Son 2 Oda!</span>
                   </div>
                 </div>
                 <div className="p-6">
-                  <h4 className="text-lg font-bold text-secondary mb-1">{t.breeze}: Santorini</h4>
+                  <h4 className="text-lg font-bold text-secondary mb-1">Bali: Ruhsal Kaçış</h4>
                   <p className="text-xs text-on-surface-variant mb-4 leading-relaxed">
-                    4 {t.nights} • {t.boutiqueHotel} • {t.breakfastIncluded}
+                    7 Gece • Orman Evi • Kahvaltı Dahil
                   </p>
-                  <div className="bg-primary/5 p-3 rounded-xl mb-4 border border-primary/10">
-                    <p className="text-[10px] font-bold text-primary uppercase tracking-tighter">
-                      {t.stepIn}
+                  <div className="bg-primary/5 p-4 rounded-xl mb-4 border border-primary/10">
+                    <p className="text-[10px] font-bold text-primary uppercase tracking-tighter mb-1">
+                      {t.saveFirst}
                     </p>
                     <div className="flex items-baseline gap-1">
-                      <span className="text-2xl font-black text-primary">$120</span>
-                      <span className="text-xs font-semibold text-primary-container">/{translations[language].common.monthAbbr} (12 {translations[language].common.installments})</span>
+                      <span className="text-2xl font-black text-primary">$155</span>
+                      <span className="text-xs font-semibold text-primary-container">/ay (12 Taksit)</span>
                     </div>
                   </div>
-                  <button className="w-full py-2.5 bg-secondary text-white rounded-xl font-bold text-sm hover:bg-primary transition-colors">{t.catch}</button>
+                  <button 
+                    onClick={() => handleReserve("Bali", 1860, 12)}
+                    className="w-full py-3 bg-[#4a5578] text-white rounded-xl font-bold text-sm hover:bg-primary transition-colors active:scale-95"
+                  >
+                    Hemen Rezerve Et
+                  </button>
                 </div>
               </motion.div>
             </div>
@@ -712,7 +1178,7 @@ const FeaturesBento = ({ language }: { language: "tr" | "en" }) => {
   );
 };
 
-const PackagesSection = ({ onSelect, language }: { onSelect: () => void, language: "tr" | "en" }) => {
+const PackagesSection = ({ onSelect, language }: { onSelect: (plan: { destination: string, budget: number, months: number }) => void, language: "tr" | "en" }) => {
   const t = translations[language].packages;
   return (
     <section id="rotalar" className="py-24 bg-white scroll-mt-20">
@@ -745,7 +1211,10 @@ const PackagesSection = ({ onSelect, language }: { onSelect: () => void, languag
                     <p className="text-3xl font-black text-primary">{pkg.price}<span className="text-sm font-medium">/{translations[language].common.monthAbbr}</span></p>
                   </div>
                   <button 
-                    onClick={onSelect}
+                    onClick={() => {
+                      const budget = parseInt(pkg.price.replace(/[^0-9]/g, '')) * 12;
+                      onSelect({ destination: pkg.title, budget, months: 12 });
+                    }}
                     className="w-12 h-12 bg-secondary text-white rounded-full flex items-center justify-center group-hover:bg-primary transition-colors"
                   >
                     <ChevronRight className="w-6 h-6" />
@@ -762,11 +1231,12 @@ const PackagesSection = ({ onSelect, language }: { onSelect: () => void, languag
 
 const TrustSection = ({ language }: { language: "tr" | "en" }) => {
   const t = translations[language].trust;
+
   return (
-    <section id="guvenlik" className="py-16 border-t border-outline-variant/20 bg-white scroll-mt-20">
+    <section id="guvenlik" className="py-16 border-t border-outline-variant/20 bg-white scroll-mt-20 overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-12 opacity-80 hover:opacity-100 transition-opacity">
-          <div className="flex flex-wrap justify-center gap-12 grayscale">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-12">
+          <div className="flex flex-wrap justify-center gap-12 grayscale opacity-80 hover:opacity-100 transition-opacity">
             <div className="flex items-center gap-2">
               <Landmark className="w-10 h-10 text-secondary" />
               <span className="font-bold text-xl font-headline tracking-tighter text-secondary">{t.bank}</span>
@@ -778,7 +1248,7 @@ const TrustSection = ({ language }: { language: "tr" | "en" }) => {
             <div className="flex items-center gap-2 text-3xl font-bold italic font-headline tracking-tighter text-secondary">VISA</div>
             <div className="flex items-center gap-2 text-3xl font-bold italic font-headline tracking-tighter text-secondary">Mastercard</div>
           </div>
-          <div className="flex gap-4">
+          <div className="flex gap-4 opacity-80 hover:opacity-100 transition-opacity">
             <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
               <Shield className="w-6 h-6 text-primary" />
             </div>
@@ -793,16 +1263,21 @@ const TrustSection = ({ language }: { language: "tr" | "en" }) => {
   );
 };
 
-const SavingPlan = ({ onBack, onStartPlan, language }: { onBack: () => void, onStartPlan: (plan: { destination: string, budget: number, months: number }) => void, language: "tr" | "en" }) => {
+const SavingPlan = ({ onBack, onStartPlan, language, initialPlan }: { 
+  onBack: () => void, 
+  onStartPlan: (plan: { destination: string, budget: number, months: number }) => void, 
+  language: "tr" | "en",
+  initialPlan?: { destination: string, budget: number, months: number } | null
+}) => {
   const t = translations[language].planner;
-  const [budget, setBudget] = useState(2000);
-  const [months, setMonths] = useState(12);
-  const [destination, setDestination] = useState(translations[language].planner.destinations.maldives);
+  const [budget, setBudget] = useState(initialPlan?.budget || 1000);
+  const [months, setMonths] = useState(initialPlan?.months || 12);
+  const [destination, setDestination] = useState(initialPlan?.destination || translations[language].planner.destinations.maldives);
 
   const monthlyAmount = Math.round(budget / months);
 
   return (
-    <section className="pt-32 pb-20 px-6 max-w-4xl mx-auto">
+    <section className="pt-32 pb-20 px-6 max-w-4xl mx-auto min-h-[80vh] flex flex-col justify-center">
       <motion.div 
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -842,17 +1317,17 @@ const SavingPlan = ({ onBack, onStartPlan, language }: { onBack: () => void, onS
                 <label className="block text-sm font-bold text-secondary mb-3 uppercase tracking-wider">{t.budget} ($)</label>
                 <input 
                   type="range" 
-                  min="500" 
-                  max="10000" 
-                  step="100"
+                  min="50" 
+                  max="5000" 
+                  step="50"
                   value={budget}
                   onChange={(e) => setBudget(Number(e.target.value))}
                   className="w-full accent-primary"
                 />
                 <div className="flex justify-between text-xl font-black text-primary mt-2">
-                  <span>$500</span>
+                  <span>$50</span>
                   <span className="bg-primary/10 px-4 py-1 rounded-lg">${budget}</span>
-                  <span>$10.000</span>
+                  <span>$5.000</span>
                 </div>
               </div>
 
@@ -919,10 +1394,170 @@ const SavingPlan = ({ onBack, onStartPlan, language }: { onBack: () => void, onS
   );
 };
 
-const SignUp = ({ plan, onBack, language }: { plan: { destination: string, budget: number, months: number } | null, onBack: () => void, language: "tr" | "en" }) => {
+const Login = ({ onBack, onSignUp, language }: { onBack: () => void, onSignUp: () => void, language: "tr" | "en" }) => {
   const t = translations[language].signup;
+  const common = translations[language].common;
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleGoogleLogin = async () => {
+    try {
+      await signInWithGoogle();
+      window.location.reload();
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
   return (
-    <section className="pt-32 pb-20 px-6 max-w-5xl mx-auto">
+    <section className="pt-40 pb-20 px-6 max-w-md mx-auto min-h-[80vh] flex flex-col justify-center">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white p-10 rounded-3xl shadow-2xl border border-outline-variant/10"
+      >
+        <div className="text-center mb-10">
+          <h2 className="text-3xl font-extrabold text-secondary font-headline mb-2">{common.login}</h2>
+          <p className="text-on-surface-variant text-sm">TatilFinans hesabınıza giriş yapın</p>
+        </div>
+
+        {error && (
+          <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-100 mb-6">
+            {error}
+          </div>
+        )}
+
+        <div className="space-y-6">
+          <button 
+            onClick={handleGoogleLogin}
+            className="w-full flex items-center justify-center gap-3 bg-white border border-outline-variant/30 py-3.5 rounded-xl font-bold text-secondary hover:bg-surface-container-low transition-all active:scale-95"
+          >
+            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="w-5 h-5" />
+            Google ile Giriş Yap
+          </button>
+
+          <div className="relative flex items-center py-2">
+            <div className="flex-grow border-t border-outline-variant/20"></div>
+            <span className="flex-shrink mx-4 text-xs font-bold text-slate-400 uppercase tracking-widest">veya</span>
+            <div className="flex-grow border-t border-outline-variant/20"></div>
+          </div>
+
+          <form className="space-y-4" onSubmit={(e) => e.preventDefault()}>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-secondary uppercase">{t.email}</label>
+              <input 
+                className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                placeholder={t.emailPlaceholder} 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-secondary uppercase">{t.password}</label>
+              <input 
+                className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                placeholder="••••••••" 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+            </div>
+            <button 
+              disabled={loading}
+              className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 disabled:opacity-50"
+            >
+              {loading ? "Giriş Yapılıyor..." : common.login}
+            </button>
+          </form>
+
+          <p className="text-center text-sm text-on-surface-variant">
+            Hesabınız yok mu? <button onClick={onSignUp} className="text-primary font-bold hover:underline">Üye Ol</button>
+          </p>
+          
+          <button 
+            onClick={onBack}
+            className="w-full text-center text-xs font-bold text-slate-400 hover:text-primary transition-colors mt-4"
+          >
+            Anasayfaya Dön
+          </button>
+        </div>
+      </motion.div>
+    </section>
+  );
+};
+
+const SignUp = ({ type = "individual", plan, onBack, onLogin, language }: { type?: "individual" | "corporate", plan: { destination: string, budget: number, months: number } | null, onBack: () => void, onLogin: () => void, language: "tr" | "en" }) => {
+  const t = translations[language].signup;
+  const [formData, setFormData] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    password: "",
+    phone: "",
+    companyName: "",
+    taxNumber: "",
+    taxOffice: "",
+    authorizedPerson: "",
+    tcNo: ""
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, formData.password);
+      const user = userCredential.user;
+
+      const profileData: any = {
+        uid: user.uid,
+        email: user.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone,
+        type: type,
+        createdAt: Timestamp.now(),
+        role: "user"
+      };
+
+      if (type === "corporate") {
+        profileData.companyName = formData.companyName;
+        profileData.taxNumber = formData.taxNumber;
+        profileData.taxOffice = formData.taxOffice;
+        profileData.authorizedPerson = formData.authorizedPerson;
+      } else {
+        profileData.tcNo = formData.tcNo;
+      }
+
+      if (plan) {
+        profileData.activePlan = {
+          ...plan,
+          startDate: Timestamp.now(),
+          status: "active"
+        };
+      }
+
+      await setDoc(doc(db, "users", user.uid), profileData);
+      setSuccess(true);
+      setTimeout(() => {
+        window.location.reload(); // Reload to trigger onAuthStateChanged and view update
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || t.error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <section className="pt-32 pb-20 px-6 max-w-5xl mx-auto min-h-[80vh] flex flex-col justify-center">
       <div className="grid lg:grid-cols-2 gap-12 items-start">
         <motion.div 
           initial={{ opacity: 0, x: -20 }}
@@ -936,8 +1571,12 @@ const SignUp = ({ plan, onBack, language }: { plan: { destination: string, budge
             >
               <ArrowRight className="w-4 h-4 rotate-180" /> {t.back}
             </button>
-            <h2 className="text-4xl font-extrabold text-secondary font-headline mb-4">{t.title}</h2>
-            <p className="text-on-surface-variant text-lg">{t.subtitle}</p>
+            <h2 className="text-4xl font-extrabold text-secondary font-headline mb-4">
+              {type === "corporate" ? t.corporateTitle : t.individualTitle}
+            </h2>
+            <p className="text-on-surface-variant text-lg">
+              {type === "corporate" ? t.corporateSubtitle : t.subtitle}
+            </p>
           </div>
 
           {plan && (
@@ -974,46 +1613,174 @@ const SignUp = ({ plan, onBack, language }: { plan: { destination: string, budge
           animate={{ opacity: 1, scale: 1 }}
           className="bg-white p-10 rounded-3xl shadow-2xl border border-outline-variant/10"
         >
-          <form className="space-y-6" onSubmit={(e) => e.preventDefault()}>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-secondary uppercase">{t.firstName}</label>
-                <input className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" placeholder={t.firstNamePlaceholder} type="text" />
+          {success ? (
+            <div className="text-center py-12 space-y-4">
+              <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto">
+                <CheckCircle2 className="w-12 h-12" />
               </div>
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-secondary uppercase">{t.lastName}</label>
-                <input className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" placeholder={t.lastNamePlaceholder} type="text" />
+              <h3 className="text-2xl font-bold text-secondary">{t.success}</h3>
+            </div>
+          ) : (
+            <form className="space-y-6" onSubmit={handleSubmit}>
+              {error && (
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium border border-red-100">
+                  {error}
+                </div>
+              )}
+
+              {type === "corporate" && (
+                <div className="space-y-4 pb-4 border-b border-outline-variant/10">
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-secondary uppercase">{t.companyName}</label>
+                    <input 
+                      required
+                      className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                      placeholder="TatilFinans Teknolojileri A.Ş." 
+                      type="text" 
+                      value={formData.companyName}
+                      onChange={(e) => setFormData({...formData, companyName: e.target.value})}
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-secondary uppercase">{t.taxNumber}</label>
+                      <input 
+                        required
+                        className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                        placeholder="1234567890" 
+                        type="text" 
+                        value={formData.taxNumber}
+                        onChange={(e) => setFormData({...formData, taxNumber: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-xs font-bold text-secondary uppercase">{t.taxOffice}</label>
+                      <input 
+                        required
+                        className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                        placeholder="Ümraniye" 
+                        type="text" 
+                        value={formData.taxOffice}
+                        onChange={(e) => setFormData({...formData, taxOffice: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-xs font-bold text-secondary uppercase">{t.authorizedPerson}</label>
+                    <input 
+                      required
+                      className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                      placeholder={t.firstNamePlaceholder + " " + t.lastNamePlaceholder} 
+                      type="text" 
+                      value={formData.authorizedPerson}
+                      onChange={(e) => setFormData({...formData, authorizedPerson: e.target.value})}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-secondary uppercase">{t.firstName}</label>
+                  <input 
+                    required
+                    className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                    placeholder={t.firstNamePlaceholder} 
+                    type="text" 
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({...formData, firstName: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-secondary uppercase">{t.lastName}</label>
+                  <input 
+                    required
+                    className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                    placeholder={t.lastNamePlaceholder} 
+                    type="text" 
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({...formData, lastName: e.target.value})}
+                  />
+                </div>
               </div>
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-secondary uppercase">{t.email}</label>
-              <input className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" placeholder={t.emailPlaceholder} type="email" />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-secondary uppercase">{t.password}</label>
-              <input className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" placeholder="••••••••" type="password" />
-            </div>
-            <div className="flex items-start gap-3">
-              <input className="mt-1 accent-primary" type="checkbox" id="terms" />
-              <label className="text-xs text-on-surface-variant leading-relaxed" htmlFor="terms">
-                {language === "tr" ? (
-                  <>
-                    <a className="text-primary font-bold hover:underline" href="#">{t.terms}</a> {t.and} <a className="text-primary font-bold hover:underline" href="#">{t.privacy}</a>'nı {t.agreeText}
-                  </>
-                ) : (
-                  <>
-                    {t.agreeText} <a className="text-primary font-bold hover:underline" href="#">{t.terms}</a> {t.and} <a className="text-primary font-bold hover:underline" href="#">{t.privacy}</a>.
-                  </>
-                )}
-              </label>
-            </div>
-            <button className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 hover:bg-primary-container transition-all active:scale-95">
-              {t.submit}
-            </button>
-            <p className="text-center text-sm text-on-surface-variant">
-              {t.hasAccount} <a className="text-primary font-bold hover:underline" href="#">{t.login}</a>
-            </p>
-          </form>
+
+              {type === "individual" && (
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-secondary uppercase">{t.tcNo}</label>
+                  <input 
+                    className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                    placeholder="12345678901" 
+                    type="text" 
+                    value={formData.tcNo}
+                    onChange={(e) => setFormData({...formData, tcNo: e.target.value})}
+                  />
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-secondary uppercase">{t.email}</label>
+                  <input 
+                    required
+                    className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                    placeholder={t.emailPlaceholder} 
+                    type="email" 
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-secondary uppercase">{t.phone}</label>
+                  <input 
+                    required
+                    className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                    placeholder="05XX XXX XX XX" 
+                    type="tel" 
+                    value={formData.phone}
+                    onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-secondary uppercase">{t.password}</label>
+                <input 
+                  required
+                  className="w-full bg-surface-container-low border-none rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-primary" 
+                  placeholder="••••••••" 
+                  type="password" 
+                  value={formData.password}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                />
+              </div>
+
+              <div className="flex items-start gap-3">
+                <input required className="mt-1 accent-primary" type="checkbox" id="terms" />
+                <label className="text-xs text-on-surface-variant leading-relaxed" htmlFor="terms">
+                  {language === "tr" ? (
+                    <>
+                      <a className="text-primary font-bold hover:underline" href="#">{t.terms}</a> {t.and} <a className="text-primary font-bold hover:underline" href="#">{t.privacy}</a>'nı {t.agreeText}
+                    </>
+                  ) : (
+                    <>
+                      {t.agreeText} <a className="text-primary font-bold hover:underline" href="#">{t.terms}</a> {t.and} <a className="text-primary font-bold hover:underline" href="#">{t.privacy}</a>.
+                    </>
+                  )}
+                </label>
+              </div>
+              <button 
+                disabled={loading}
+                className="w-full bg-primary text-white py-4 rounded-xl font-bold text-lg shadow-lg shadow-primary/20 hover:bg-primary-container transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <div className="w-6 h-6 border-2 border-white/20 border-t-white rounded-full animate-spin mx-auto" />
+                ) : t.submit}
+              </button>
+              <p className="text-center text-sm text-on-surface-variant">
+                {t.hasAccount} <button onClick={onLogin} className="text-primary font-bold hover:underline">{t.login}</button>
+              </p>
+            </form>
+          )}
         </motion.div>
       </div>
     </section>
@@ -1486,7 +2253,12 @@ const Footer = ({ onNavigate, language }: { onNavigate: (view: any) => void, lan
     <footer className="bg-slate-900 text-white py-16 px-6">
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-12 max-w-7xl mx-auto w-full">
         <div className="col-span-2">
-          <div className="text-2xl font-black text-white mb-6 font-headline tracking-tighter">TatilFinans</div>
+          <div 
+            className="text-2xl font-black text-white mb-6 font-headline tracking-tighter cursor-pointer hover:text-primary transition-colors"
+            onClick={() => onNavigate("landing")}
+          >
+            TatilFinans
+          </div>
           <p className="text-slate-400 text-sm max-w-xs leading-relaxed mb-8">
             {t.desc}
           </p>
@@ -1528,39 +2300,580 @@ const Footer = ({ onNavigate, language }: { onNavigate: (view: any) => void, lan
   );
 };
 
-export default function App() {
-  const [view, setView] = useState<"landing" | "saving-plan" | "sign-up" | "about" | "contact" | "career" | "faq" | "help" | "blog">("landing");
-  const [language, setLanguage] = useState<"tr" | "en">("tr");
-  const [selectedPlan, setSelectedPlan] = useState<{ destination: string, budget: number, months: number } | null>(null);
+const UserDashboard = ({ language }: { language: "tr" | "en" }) => {
+  const t = language === "tr" ? {
+    title: "Bireysel Panelim",
+    welcome: "Hoş geldin,",
+    activePlan: "Aktif Birikim Planın",
+    totalSaved: "Toplam Birikim",
+    monthlyTarget: "Aylık Hedef",
+    remaining: "Kalan Süre",
+    transactions: "Son İşlemler",
+    noPlan: "Henüz aktif bir planın bulunmuyor.",
+    startPlan: "Hemen Plan Oluştur"
+  } : {
+    title: "My Individual Dashboard",
+    welcome: "Welcome,",
+    activePlan: "Your Active Saving Plan",
+    totalSaved: "Total Saved",
+    monthlyTarget: "Monthly Target",
+    remaining: "Remaining Time",
+    transactions: "Recent Transactions",
+    noPlan: "You don't have an active plan yet.",
+    startPlan: "Create a Plan Now"
+  };
+
+  return (
+    <section className="pt-32 pb-20 px-6 max-w-7xl mx-auto min-h-[80vh]">
+      <div className="mb-12">
+        <h1 className="text-4xl font-extrabold text-secondary font-headline mb-2">{t.title}</h1>
+        <p className="text-on-surface-variant">{t.welcome} {auth.currentUser?.displayName}</p>
+      </div>
+
+      <div className="grid lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 space-y-8">
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-outline-variant/20">
+            <h2 className="text-xl font-bold text-secondary mb-6">{t.activePlan}</h2>
+            <div className="flex items-center justify-center py-12 text-center">
+              <div className="space-y-4">
+                <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center text-primary mx-auto">
+                  <Wallet className="w-8 h-8" />
+                </div>
+                <p className="text-on-surface-variant">{t.noPlan}</p>
+                <button className="bg-primary text-white px-6 py-2 rounded-xl font-bold hover:bg-primary-container transition-colors">
+                  {t.startPlan}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-8 rounded-3xl shadow-xl border border-outline-variant/20">
+            <h2 className="text-xl font-bold text-secondary mb-6">{t.transactions}</h2>
+            <div className="space-y-4">
+              {[1, 2, 3].map((_, i) => (
+                <div key={i} className="flex items-center justify-between py-4 border-b border-outline-variant/10 last:border-0">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 bg-surface-container-highest rounded-full flex items-center justify-center">
+                      <CreditCard className="w-5 h-5 text-on-surface-variant" />
+                    </div>
+                    <div>
+                      <p className="font-bold text-secondary">Aylık Birikim Ödemesi</p>
+                      <p className="text-xs text-on-surface-variant">24 Mart 2026</p>
+                    </div>
+                  </div>
+                  <p className="font-black text-primary">+$150.00</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="bg-secondary text-white p-8 rounded-3xl shadow-xl">
+            <p className="text-sm font-bold opacity-70 uppercase tracking-widest mb-2">{t.totalSaved}</p>
+            <p className="text-5xl font-black mb-6">$0.00</p>
+            <div className="space-y-4">
+              <div className="flex justify-between text-sm">
+                <span className="opacity-70">{t.monthlyTarget}</span>
+                <span className="font-bold">$0.00</span>
+              </div>
+              <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden">
+                <div className="bg-primary h-full w-0"></div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-surface-container-low p-8 rounded-3xl border border-outline-variant/20">
+            <h3 className="font-bold text-secondary mb-4">Hızlı Destek</h3>
+            <p className="text-sm text-on-surface-variant mb-6">Planınla ilgili bir sorun mu var? Hemen bize ulaş.</p>
+            <button className="w-full py-3 bg-white border border-outline-variant/30 rounded-xl font-bold text-secondary hover:bg-surface-container-high transition-colors">
+              Müşteri Hizmetleri
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const CorporateDashboard = ({ language }: { language: "tr" | "en" }) => {
+  const t = language === "tr" ? {
+    title: "Kurumsal Panel",
+    welcome: "Hoş geldiniz,",
+    companyInfo: "Firma Bilgileri",
+    employeePlans: "Çalışan Birikim Planları",
+    totalCorporateSaved: "Toplam Kurumsal Birikim",
+    activeEmployees: "Aktif Çalışan Sayısı",
+    managePlans: "Planları Yönet",
+    addEmployee: "Yeni Çalışan Ekle",
+    reports: "Raporlar"
+  } : {
+    title: "Corporate Dashboard",
+    welcome: "Welcome,",
+    companyInfo: "Company Information",
+    employeePlans: "Employee Saving Plans",
+    totalCorporateSaved: "Total Corporate Savings",
+    activeEmployees: "Active Employees",
+    managePlans: "Manage Plans",
+    addEmployee: "Add New Employee",
+    reports: "Reports"
+  };
+
+  return (
+    <section className="pt-32 pb-20 px-6 max-w-7xl mx-auto min-h-[80vh]">
+      <div className="mb-12 flex justify-between items-end">
+        <div>
+          <h1 className="text-4xl font-extrabold text-secondary font-headline mb-2">{t.title}</h1>
+          <p className="text-on-surface-variant">{t.welcome} {auth.currentUser?.displayName}</p>
+        </div>
+        <div className="flex gap-4">
+          <button className="bg-surface-container-highest text-secondary px-6 py-2.5 rounded-xl font-bold hover:bg-surface-container-high transition-all flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            {t.reports}
+          </button>
+          <button className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold hover:bg-primary-container transition-all flex items-center gap-2">
+            <Plus className="w-5 h-5" />
+            {t.addEmployee}
+          </button>
+        </div>
+      </div>
+
+      <div className="grid lg:grid-cols-4 gap-8 mb-12">
+        <div className="bg-white p-6 rounded-3xl shadow-lg border border-outline-variant/10">
+          <p className="text-xs font-bold text-on-surface-variant uppercase mb-2">{t.activeEmployees}</p>
+          <p className="text-3xl font-black text-secondary">0</p>
+        </div>
+        <div className="bg-white p-6 rounded-3xl shadow-lg border border-outline-variant/10">
+          <p className="text-xs font-bold text-on-surface-variant uppercase mb-2">{t.totalCorporateSaved}</p>
+          <p className="text-3xl font-black text-primary">$0.00</p>
+        </div>
+        <div className="bg-white p-6 rounded-3xl shadow-lg border border-outline-variant/10">
+          <p className="text-xs font-bold text-on-surface-variant uppercase mb-2">Bu Ayki Ödemeler</p>
+          <p className="text-3xl font-black text-secondary">$0.00</p>
+        </div>
+        <div className="bg-white p-6 rounded-3xl shadow-lg border border-outline-variant/10">
+          <p className="text-xs font-bold text-on-surface-variant uppercase mb-2">Bekleyen Onaylar</p>
+          <p className="text-3xl font-black text-error">0</p>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl shadow-xl border border-outline-variant/20 overflow-hidden">
+        <div className="p-8 border-b border-outline-variant/10 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-secondary">{t.employeePlans}</h2>
+          <div className="relative">
+            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant" />
+            <input 
+              type="text" 
+              placeholder="Çalışan ara..." 
+              className="pl-10 pr-4 py-2 bg-surface-container-low rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left">
+            <thead className="bg-surface-container-low text-xs font-bold text-on-surface-variant uppercase tracking-widest">
+              <tr>
+                <th className="px-8 py-4">Çalışan</th>
+                <th className="px-8 py-4">Plan</th>
+                <th className="px-8 py-4">Biriken</th>
+                <th className="px-8 py-4">Durum</th>
+                <th className="px-8 py-4">İşlem</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-outline-variant/10">
+              <tr className="hover:bg-surface-container-lowest transition-colors">
+                <td className="px-8 py-12 text-center text-on-surface-variant italic" colSpan={5}>
+                  Henüz kayıtlı çalışan bulunmuyor.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+const AdminPanel = ({ language }: { language: "tr" | "en" }) => {
+  const t = translations[language].admin;
+  const [activeTab, setActiveTab] = useState<"dashboard" | "deals" | "users" | "plans">("dashboard");
+  const [deals, setDeals] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (view === "landing" && window.location.hash) {
-      const id = window.location.hash.substring(1);
-      setTimeout(() => {
-        const element = document.getElementById(id);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100);
+    const unsubDeals = onSnapshot(query(collection(db, "deals"), orderBy("createdAt", "desc")), (snap) => {
+      setDeals(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "deals"));
+
+    const unsubUsers = onSnapshot(query(collection(db, "users"), orderBy("createdAt", "desc")), (snap) => {
+      setUsers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "users"));
+
+    const unsubPlans = onSnapshot(query(collection(db, "plans"), orderBy("createdAt", "desc")), (snap) => {
+      setPlans(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (err) => handleFirestoreError(err, OperationType.LIST, "plans"));
+
+    return () => {
+      unsubDeals();
+      unsubUsers();
+      unsubPlans();
+    };
+  }, []);
+
+  const stats = {
+    totalSavings: plans.reduce((acc, p) => acc + (p.currentSavings || 0), 0),
+    activePlans: plans.filter(p => p.status === "active").length,
+    totalUsers: users.length,
+    totalBudget: plans.reduce((acc, p) => acc + (p.totalBudget || 0), 0)
+  };
+
+  const handleDeleteDeal = async (id: string) => {
+    if (window.confirm(t.deleteConfirm)) {
+      try {
+        await deleteDoc(doc(db, "deals", id));
+      } catch (err) {
+        handleFirestoreError(err, OperationType.DELETE, `deals/${id}`);
+      }
     }
+  };
+
+  const renderDashboard = () => (
+    <div className="space-y-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {[
+          { label: t.totalSavings, value: `$${stats.totalSavings.toLocaleString()}`, icon: <Wallet className="w-6 h-6" />, color: "bg-blue-500" },
+          { label: t.activePlans, value: stats.activePlans, icon: <Activity className="w-6 h-6" />, color: "bg-green-500" },
+          { label: t.totalUsers, value: stats.totalUsers, icon: <Users className="w-6 h-6" />, color: "bg-purple-500" },
+          { label: "Target Volume", value: `$${stats.totalBudget.toLocaleString()}`, icon: <TrendingUp className="w-6 h-6" />, color: "bg-orange-500" }
+        ].map((stat, i) => (
+          <div key={i} className="bg-white p-6 rounded-3xl shadow-sm border border-outline-variant/10 flex items-center gap-4">
+            <div className={`${stat.color} p-3 rounded-2xl text-white`}>
+              {stat.icon}
+            </div>
+            <div>
+              <p className="text-xs font-bold text-on-surface-variant uppercase tracking-wider">{stat.label}</p>
+              <p className="text-2xl font-black text-secondary">{stat.value}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-8">
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-outline-variant/10">
+          <h3 className="text-xl font-bold text-secondary mb-6">{t.recentActivity}</h3>
+          <div className="space-y-4">
+            {plans.slice(0, 5).map((plan, i) => (
+              <div key={i} className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                    <PlaneTakeoff className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <p className="font-bold text-secondary text-sm">{plan.destination}</p>
+                    <p className="text-xs text-on-surface-variant">{plan.userId.substring(0, 8)}...</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="font-black text-primary text-sm">${plan.totalBudget}</p>
+                  <p className="text-[10px] font-bold text-on-surface-variant uppercase">{plan.status}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-outline-variant/10">
+          <h3 className="text-xl font-bold text-secondary mb-6">User Growth</h3>
+          <div className="h-64 flex items-end gap-2">
+            {[40, 60, 45, 90, 65, 80, 100].map((h, i) => (
+              <div key={i} className="flex-1 bg-primary/20 rounded-t-lg relative group">
+                <motion.div 
+                  initial={{ height: 0 }}
+                  animate={{ height: `${h}%` }}
+                  className="absolute bottom-0 left-0 right-0 bg-primary rounded-t-lg transition-all"
+                />
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-between mt-4 text-[10px] font-bold text-on-surface-variant uppercase">
+            <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderDeals = () => (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <h3 className="text-2xl font-bold text-secondary">{t.deals}</h3>
+        <button className="bg-primary text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg shadow-primary/20">
+          <Plus className="w-5 h-5" /> {t.addDeal}
+        </button>
+      </div>
+      <div className="bg-white rounded-3xl shadow-sm border border-outline-variant/10 overflow-hidden">
+        <table className="w-full text-left">
+          <thead className="bg-surface-container-low border-b border-outline-variant/20">
+            <tr>
+              <th className="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">{t.title}</th>
+              <th className="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">{t.category}</th>
+              <th className="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">{t.price}</th>
+              <th className="px-6 py-4 text-xs font-bold text-on-surface-variant uppercase tracking-wider">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-outline-variant/10">
+            {deals.map((deal) => (
+              <tr key={deal.id} className="hover:bg-surface-container-low/50 transition-colors">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <img src={deal.imageUrl || "https://picsum.photos/seed/deal/100/100"} className="w-10 h-10 rounded-lg object-cover" referrerPolicy="no-referrer" />
+                    <span className="font-bold text-secondary text-sm">{deal.title}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className="px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full uppercase">{deal.category}</span>
+                </td>
+                <td className="px-6 py-4 font-black text-primary">${deal.price}</td>
+                <td className="px-6 py-4">
+                  <div className="flex gap-2">
+                    <button className="p-2 text-on-surface-variant hover:text-primary transition-colors"><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => handleDeleteDeal(deal.id)} className="p-2 text-on-surface-variant hover:text-error transition-colors"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="pt-32 pb-20 px-6 max-w-7xl mx-auto min-h-screen">
+      <div className="flex flex-col lg:flex-row gap-12">
+        {/* Sidebar */}
+        <div className="lg:w-64 space-y-2">
+          {[
+            { id: "dashboard", label: t.dashboard, icon: <LayoutDashboard className="w-5 h-5" /> },
+            { id: "deals", label: t.deals, icon: <AlarmClock className="w-5 h-5" /> },
+            { id: "users", label: t.users, icon: <Users className="w-5 h-5" /> },
+            { id: "plans", label: t.plans, icon: <Wallet className="w-5 h-5" /> }
+          ].map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as any)}
+              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold transition-all ${
+                activeTab === item.id 
+                ? "bg-primary text-white shadow-lg shadow-primary/20" 
+                : "text-on-surface-variant hover:bg-surface-container-low"
+              }`}
+            >
+              {item.icon}
+              {item.label}
+            </button>
+          ))}
+          <div className="pt-8 mt-8 border-t border-outline-variant/20">
+            <button className="w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-bold text-on-surface-variant hover:bg-surface-container-low transition-all">
+              <Settings className="w-5 h-5" />
+              Settings
+            </button>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+            </div>
+          ) : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                {activeTab === "dashboard" && renderDashboard()}
+                {activeTab === "deals" && renderDeals()}
+                {activeTab === "users" && (
+                  <div className="bg-white p-8 rounded-3xl shadow-sm border border-outline-variant/10">
+                    <h3 className="text-2xl font-bold text-secondary mb-6">{t.users}</h3>
+                    <div className="space-y-4">
+                      {users.map(u => (
+                        <div key={u.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold">
+                              {u.email[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-bold text-secondary">{u.email}</p>
+                              <p className="text-xs text-on-surface-variant">{u.role}</p>
+                            </div>
+                          </div>
+                          <span className="text-xs text-on-surface-variant">{u.createdAt?.toDate().toLocaleDateString()}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {activeTab === "plans" && (
+                  <div className="bg-white p-8 rounded-3xl shadow-sm border border-outline-variant/10">
+                    <h3 className="text-2xl font-bold text-secondary mb-6">{t.plans}</h3>
+                    <div className="space-y-4">
+                      {plans.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-4 bg-surface-container-low rounded-2xl">
+                          <div>
+                            <p className="font-bold text-secondary">{p.destination}</p>
+                            <p className="text-xs text-on-surface-variant">${p.monthlyAmount}/mo • {p.durationMonths} months</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-black text-primary">${p.totalBudget}</p>
+                            <p className="text-[10px] font-bold text-on-surface-variant uppercase">{p.status}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </motion.div>
+            </AnimatePresence>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default function App() {
+  const [view, setView] = useState<"landing" | "saving-plan" | "sign-up" | "login" | "about" | "contact" | "career" | "faq" | "help" | "blog" | "admin">("landing");
+  const [language, setLanguage] = useState<"tr" | "en">("tr");
+  const [isCalcOpen, setIsCalcOpen] = useState(false);
+  const [signUpType, setSignUpType] = useState<"individual" | "corporate">("individual");
+  const [selectedPlan, setSelectedPlan] = useState<{ destination: string, budget: number, months: number } | null>(null);
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [role, setRole] = useState<string | null>(null);
+  const [userType, setUserType] = useState<"individual" | "corporate" | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [view]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        // Check or create user profile
+        const userRef = doc(db, "users", u.uid);
+        try {
+          const userSnap = await getDoc(userRef);
+          if (userSnap.exists()) {
+            setRole(userSnap.data().role);
+            setUserType(userSnap.data().type);
+          } else {
+            // Default role is user
+            const newRole = u.email === "bulent.bulu7@gmail.com" ? "admin" : "user";
+            const newType = "individual";
+            await setDoc(userRef, {
+              uid: u.uid,
+              email: u.email,
+              firstName: u.displayName?.split(" ")[0] || "",
+              lastName: u.displayName?.split(" ").slice(1).join(" ") || "",
+              type: newType,
+              role: newRole,
+              createdAt: Timestamp.now()
+            });
+            setRole(newRole);
+            setUserType(newType);
+          }
+        } catch (err) {
+          handleFirestoreError(err, OperationType.GET, `users/${u.uid}`);
+        }
+      } else {
+        setRole(null);
+      }
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    const handleHashScroll = () => {
+      if (view === "landing" && window.location.hash) {
+        const id = window.location.hash.substring(1);
+        setTimeout(() => {
+          const element = document.getElementById(id);
+          if (element) {
+            element.scrollIntoView({ behavior: "smooth" });
+          }
+        }, 100);
+      }
+    };
+
+    handleHashScroll();
+    window.addEventListener('hashchange', handleHashScroll);
+    return () => window.removeEventListener('hashchange', handleHashScroll);
   }, [view]);
 
   const handleStartPlan = (plan: { destination: string, budget: number, months: number }) => {
     setSelectedPlan(plan);
-    setView("sign-up");
+    if (user) {
+      navigateTo("dashboard");
+    } else {
+      setSignUpType("individual");
+      navigateTo("sign-up");
+    }
   };
 
   const navigateTo = (newView: any) => {
     setView(newView);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    // Clear hash when navigating to a new view
+    if (window.location.hash) {
+      window.history.pushState("", document.title, window.location.pathname + window.location.search);
+    }
   };
 
   const renderView = () => {
+    if (loading) {
+      return (
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="w-12 h-12 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
+        </div>
+      );
+    }
+
     switch (view) {
+      case "admin":
+        return role === "admin" ? <AdminPanel language={language} /> : <div className="pt-32 text-center">Unauthorized</div>;
+      case "dashboard":
+        if (!user) return <Login onBack={() => setView("landing")} onSignUp={() => setView("sign-up")} language={language} />;
+        return userType === "corporate" ? <CorporateDashboard language={language} /> : <UserDashboard language={language} />;
+      case "login":
+        return (
+          <Login 
+            onBack={() => setView("landing")} 
+            onSignUp={() => setView("sign-up")} 
+            language={language} 
+          />
+        );
       case "sign-up":
-        return <SignUp plan={selectedPlan} onBack={() => setView("saving-plan")} language={language} />;
+        return (
+          <SignUp 
+            type={signUpType}
+            plan={selectedPlan} 
+            onBack={() => setView(selectedPlan ? "saving-plan" : "landing")} 
+            onLogin={() => setView("login")}
+            language={language} 
+          />
+        );
       case "saving-plan":
-        return <SavingPlan onBack={() => setView("landing")} onStartPlan={handleStartPlan} language={language} />;
+        return <SavingPlan onBack={() => setView("landing")} onStartPlan={handleStartPlan} language={language} initialPlan={selectedPlan} />;
       case "about":
         return <AboutPage language={language} />;
       case "contact":
@@ -1576,11 +2889,20 @@ export default function App() {
       default:
         return (
           <main>
-            <Hero onStart={() => setView("saving-plan")} language={language} />
-            <DealsSection language={language} />
+            <Hero onStart={() => {
+              setSelectedPlan(null);
+              setView("saving-plan");
+            }} language={language} />
+            <DealsSection onSelect={(plan) => {
+              setSelectedPlan(plan);
+              setView("saving-plan");
+            }} language={language} />
             <ProcessSection language={language} />
             <FeaturesBento language={language} />
-            <PackagesSection onSelect={() => setView("saving-plan")} language={language} />
+            <PackagesSection onSelect={(plan) => {
+              setSelectedPlan(plan);
+              setView("saving-plan");
+            }} language={language} />
             <TrustSection language={language} />
           </main>
         );
@@ -1591,12 +2913,52 @@ export default function App() {
     <div className="min-h-screen bg-background selection:bg-primary/20">
       <Navbar 
         onNavigate={() => setView("landing")} 
-        onStart={() => setView("saving-plan")} 
+        onStart={(type) => {
+          if (type) setSignUpType(type);
+          setSelectedPlan(null);
+          setView("sign-up");
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }}
+        onLoginClick={() => setView("login")}
         language={language}
         setLanguage={setLanguage}
+        user={user}
+        role={role}
+        onAdminClick={() => setView("admin")}
+        onDashboardClick={() => setView("dashboard")}
       />
-      {renderView()}
+      <div className="min-h-[80vh]">
+        {renderView()}
+      </div>
       <Footer onNavigate={navigateTo} language={language} />
+
+      <button 
+        onClick={() => setIsCalcOpen(true)}
+        className="fixed bottom-8 right-8 w-16 h-16 bg-[#1a637a] text-white rounded-full shadow-2xl flex items-center justify-center z-50 hover:scale-110 transition-transform active:scale-95"
+      >
+        <Calculator className="w-8 h-8" />
+      </button>
+
+      <AnimatePresence>
+        {isCalcOpen && (
+          <CalculatorModal 
+            isOpen={isCalcOpen} 
+            onClose={() => setIsCalcOpen(false)} 
+            onStart={(plan) => {
+              setIsCalcOpen(false);
+              setSelectedPlan({
+                destination: translations[language].planner.destinations.maldives,
+                budget: plan.target,
+                months: plan.months
+              });
+              setSignUpType("individual");
+              setView("sign-up");
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            language={language}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

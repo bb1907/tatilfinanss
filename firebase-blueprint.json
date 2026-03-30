@@ -1,0 +1,91 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "The unique identifier for the user." },
+        "email": { "type": "string", "format": "email", "description": "User's email address." },
+        "firstName": { "type": "string", "description": "User's first name." },
+        "lastName": { "type": "string", "description": "User's last name." },
+        "phone": { "type": "string", "description": "User's phone number." },
+        "type": { "type": "string", "enum": ["individual", "corporate"], "description": "Type of user account." },
+        "companyName": { "type": "string", "description": "Company name for corporate users." },
+        "taxNumber": { "type": "string", "description": "Tax number for corporate users." },
+        "taxOffice": { "type": "string", "description": "Tax office for corporate users." },
+        "authorizedPerson": { "type": "string", "description": "Authorized person for corporate users." },
+        "tcNo": { "type": "string", "description": "ID number for individual users." },
+        "role": { "type": "string", "enum": ["admin", "user"], "description": "User's role in the application." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the user profile was created." }
+      },
+      "required": ["uid", "email", "role", "type"]
+    },
+    "Plan": {
+      "title": "Savings Plan",
+      "description": "A vacation savings plan created by a user.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The UID of the user who owns this plan." },
+        "destination": { "type": "string", "description": "The vacation destination." },
+        "totalBudget": { "type": "number", "description": "The total target budget for the vacation." },
+        "durationMonths": { "type": "number", "description": "The duration of the savings plan in months." },
+        "monthlyAmount": { "type": "number", "description": "The monthly savings amount." },
+        "currentSavings": { "type": "number", "description": "The amount saved so far." },
+        "status": { "type": "string", "enum": ["active", "completed", "cancelled"], "description": "Current status of the plan." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the plan was created." }
+      },
+      "required": ["userId", "destination", "totalBudget", "durationMonths", "monthlyAmount", "status"]
+    },
+    "Deal": {
+      "title": "Deal",
+      "description": "A special vacation deal or flight offer.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the deal." },
+        "description": { "type": "string", "description": "Detailed description of the deal." },
+        "price": { "type": "number", "description": "Current price of the deal." },
+        "originalPrice": { "type": "number", "description": "Original price before the discount." },
+        "imageUrl": { "type": "string", "format": "uri", "description": "URL of the deal's image." },
+        "category": { "type": "string", "enum": ["flight", "hotel", "package"], "description": "Category of the deal." },
+        "isPopular": { "type": "boolean", "description": "Whether this is a popular choice." },
+        "limitedTime": { "type": "boolean", "description": "Whether this is a limited time offer." },
+        "lastRooms": { "type": "number", "description": "Number of rooms left if applicable." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "When the deal was added." }
+      },
+      "required": ["title", "price", "category"]
+    },
+    "BlogPost": {
+      "title": "Blog Post",
+      "description": "A blog article for the travel blog.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the blog post." },
+        "description": { "type": "string", "description": "Short summary of the post." },
+        "content": { "type": "string", "description": "Full content of the blog post." },
+        "date": { "type": "string", "format": "date", "description": "Publication date." },
+        "imageUrl": { "type": "string", "format": "uri", "description": "URL of the post's image." },
+        "author": { "type": "string", "description": "Author of the post." }
+      },
+      "required": ["title", "content", "date"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile documents."
+    },
+    "/plans/{planId}": {
+      "schema": "Plan",
+      "description": "Savings plan documents."
+    },
+    "/deals/{dealId}": {
+      "schema": "Deal",
+      "description": "Vacation and flight deals."
+    },
+    "/blogPosts/{postId}": {
+      "schema": "BlogPost",
+      "description": "Blog articles."
+    }
+  }
+}
